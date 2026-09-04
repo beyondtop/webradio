@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="nxWC8U0RNmxKZX7GnUGuuh">
+<head data-page-node-id="5U3e9KsiDV9crZXBOwMhHC">
+<meta charset="UTF-8" data-page-node-id="PGGSxUksuCTCsKwnB6lElU">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" data-page-node-id="EPReVlXPSPWjEqvF7tWARt">
+<title>Radio Web · 网络电台播放器</title>
+<link rel="stylesheet" href="style.css" data-page-node-id="KFHSED65jV4A9EaWrGE6Gd">
+</head>
+<body data-page-node-id="fjUJnKzTg3LyGw00tnyvHO">
+
+<header class="topbar" data-page-node-id="8sQejjpVqfDOMdH22jYhST">
+  <div class="brand" data-page-node-id="tP03YG54men5RoGnFP4LvF">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" data-page-node-id="w9hSVcmO1bCJNkLengeo1y"><path d="M12 3a9 9 0 1 0 9 9" data-page-node-id="Vi4K28H9cZTAJDe1IAxhBO"/><path d="M12 8a4 4 0 1 0 4 4" data-page-node-id="uicm6sVGhPHG0oXbHpoy8T"/><circle cx="12" cy="12" r="1.2" fill="currentColor" data-page-node-id="VrKy2cm4WwN5hCg4y9Gv21"/></svg>
+    <span data-page-node-id="Vyq8lc4BbbNOxmkY424mV6">Radio Web</span>
+  </div>
+  <nav class="tabs" id="tabs" data-page-node-id="EG0QAwFpvuymNSOhoHyPbx">
+    <button data-view="search" class="tab active" data-page-node-id="MmJYWoD56uBBF63PiXG0Xw">🔍 搜索</button>
+    <button data-view="favs" class="tab" data-page-node-id="i14gYnRLoAGW1vd86c7L0o">⭐ 收藏 <span id="favCount" class="count" data-page-node-id="BrO0PHBDjGGWNR6EnMa60B"></span></button>
+  </nav>
+</header>
+
+<main data-page-node-id="cb7r32NcamrAGWiSdah6FC">
+  <!-- 搜索视图 -->
+  <section id="view-search" class="view active" data-page-node-id="rhGZZ3R4CZA7bJFkgqzsYy">
+    <form id="searchForm" class="searchbar" autocomplete="off" data-page-node-id="V3dRNhh6Bqf0pSVSFUKshP">
+      <input id="searchInput" type="search" placeholder="搜索电台：classical / lofi / jazz / 中文…" enterkeyhint="search" data-page-node-id="ne1TTikFT2xHmCMYwsIwAT">
+      <button type="submit" class="primary" data-page-node-id="FeKaH7C8jGZvvuz2xbQorq">搜索</button>
+    </form>
+    <div id="searchStatus" class="statusline" hidden></div>
+    <div id="searchCount" class="countline" hidden></div>
+    <nav id="pager" class="pager" hidden aria-label="结果分页">
+      <button id="pgPrev" class="pg" disabled>‹ 上一页</button>
+      <div id="pgNums" class="pg-nums"></div>
+      <button id="pgNext" class="pg" disabled>下一页 ›</button>
+    </nav>
+    <ul id="resultList" class="list"></ul>
+  </section>
+
+  <!-- 收藏视图 -->
+  <section id="view-favs" class="view" data-page-node-id="VtQ18SSfv9azGGMz8oZ9s9">
+    <div id="favEmpty" class="empty" hidden data-page-node-id="ML7l8Hc7zrAsvfrbwKBdju">
+      <div class="empty-icon" data-page-node-id="kzvUDr0UZI7sgEcd7qDBfp">📻</div>
+      <p data-page-node-id="UmQYEsMnQNFZlyouaBDr8F">还没有收藏任何电台</p>
+      <p class="sub" data-page-node-id="lIkGxabkLuLHscDRRfGf3k">搜索时点击条目右侧的 ☆ 即可收藏</p>
+    </div>
+    <ul id="favList" class="list" data-page-node-id="5KeoQzxC6DIbdpbH4aGQWz"></ul>
+  </section>
+</main>
+
+<!-- 播放条 -->
+<footer id="player" class="player" hidden data-page-node-id="KZWICxHDj7J06kQR6dKo1u">
+  <button id="btnPlay" class="iconbtn" aria-label="播放/暂停" data-page-node-id="YzeO68cxHzS33Gb26rbBtr">
+    <svg id="icPlay" class="ic-pl" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" data-page-node-id="KYCe0Wdpvzo2KrSaaEvsYS"><path d="M8 5v14l11-7z" data-page-node-id="LbaQ0CzohlIbJ5osNSuDFt"/></svg>
+    <svg id="icPause" class="ic-pa" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" data-page-node-id="QvGrT7LrfETyDgc3Z8cb66"><path d="M6 5h4v14H6zM14 5h4v14h-4z" data-page-node-id="LHaVGBzYHKwqvMiCBEH45I"/></svg>
+  </button>
+  <div class="nowmeta" data-page-node-id="2Q5eYMV3aKO7UtWwQwQZFF">
+    <div class="now-title" id="nowTitle" data-page-node-id="zXRrSPBYG0C1DqSn1DfINs">未在播放</div>
+    <div class="now-sub" data-page-node-id="wS7DAHSUIGfrYTJBE9nCVt">
+      <span id="liveDot" class="live" hidden data-page-node-id="ICqBF016kuwSBVzjwndEtN"></span>
+      <span id="nowSub" data-page-node-id="C9Z13XGOJwwZcgkgo1Xxmt"></span>
+    </div>
+  </div>
+  <button id="btnFav" class="iconbtn favbtn" aria-label="收藏" data-page-node-id="aesIlR9HJKztJGH65kXBJv">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" data-page-node-id="VgS0VFGHrLkH3uVoYdS1DJ"><path d="M12 20s-7-4.4-9.2-8.6C1.2 8.4 2.7 5 6 5c2 0 3.4 1.1 4 2 .6-.9 2-2 4-2 3.3 0 4.8 3.4 3.2 6.4C19 15.6 12 20 12 20z" data-page-node-id="AxUlaevaF951eRNUxBgNne"/></svg>
+  </button>
+  <input id="volume" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="音量" data-page-node-id="IgApdc2crWdAZU3U0Xhy19">
+</footer>
+
+<div id="toast" class="toast" hidden data-page-node-id="Iub0wopbpXhEgjyNFuizsd"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
