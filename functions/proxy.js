@@ -8,6 +8,7 @@
 // 安全：仅放行 http/https；阻止内网/本机目标（防 SSRF / 开放代理滥用）。
 
 const ALLOWED = new Set(["http:", "https:"]);
+const UPSTREAM_TIMEOUT_MS = 15000;
 const BLOCKED_HOSTS = new Set([
   "localhost", "127.0.0.1", "::1", "0.0.0.0",
   "metadata.google.internal",
@@ -55,19 +56,26 @@ async function handle(request) {
     return json({ error: "target not allowed" }, 400);
   }
 
-  // 透传关键请求头（Range 支持拖动/续传、UA 帮助绕过部分服务器默认拦截）
+  // 透传关键请求头（Range 支持拖动/续传、UA/Referer 帮助绕过部分服务器默认拦截）
   const headers = { "User-Agent": "RadioWeb/1.0 (proxy)" };
-  const fwd = ["range", "accept", "accept-language", "icecast-auth-user"];
+  const fwd = ["range", "accept", "accept-language", "icecast-auth-user", "referer"];
   for (const h of fwd) {
     const v = request.headers.get(h);
     if (v) headers[h] = v;
   }
 
+  // 上游 15s 内拉不到响应即放弃——慢到这种程度的流基本不可播，
+  // 快速失败让前端给出明确提示，而不是让 <audio> 无限缓冲/超时
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), UPSTREAM_TIMEOUT_MS);
   let resp;
   try {
-    resp = await fetch(up.href, { headers, redirect: "follow" });
+    resp = await fetch(up.href, { headers, redirect: "follow", signal: ctl.signal });
   } catch (e) {
-    return json({ error: "upstream unreachable: " + String(e) }, 502);
+    const timeout = e.name === "AbortError";
+    return json({ error: timeout ? "upstream timeout" : "upstream unreachable: " + String(e) }, timeout ? 504 : 502);
+  } finally {
+    clearTimeout(timer);
   }
   if (!resp.ok && resp.status !== 206 && resp.status !== 200) {
     // 404/403 等：原样透传状态码与正文给前端 audio，便于错误提示
