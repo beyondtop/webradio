@@ -10,10 +10,12 @@
 - 📄 **页码分页**：每页展示 20 条，底部「上一页/下一页 + 数字页码」可跳页；接口不返回总条数，故用"取满上限才提示仅显示前 500 条"兜底
 - 🔗 **#q= 直达**：URL 带 `#q=lofi%20hip%20hop` 直接打开即自动搜索，方便分享
 - ▶️ **即点即播**：点击条目立即播放；正在播放的行高亮
+- 🎬 **HLS 也能播**：`.m3u8` 台在桌面 Chrome/Edge/Firefox 由内置 hls.js（`vendor/hls.min.js`，自托管无外链）经 MediaSource 播放；Safari 走原生 HLS。HLS 流内的 http 分片同样自动经 `/proxy` 中转
 - 🌐 **http 流也能播**：页面是 https，浏览器会拦 http:// 音频流——本仓库内置一个 Cloudflare Pages Function 做音频中转，http 台自动走 `/proxy?u=…` 服务端拉流再以 https 返回（列表中标 `http·中转`）
 - ⭐ **收藏**：localStorage 本地持久化，不依赖账号
 - 📱 **移动端适配**：触屏友好、底部播放条含刘海安全区；audio 挂载 DOM，iOS 支持锁屏/媒体键
 - 🌙 **深浅色**：跟随系统 `prefers-color-scheme`
+- 🛟 **失败提示细分**：播放失败按真实原因提示（源失效/格式不支持/HLS/中转不可达/被自动播放拦截），不再笼统报"被浏览器拦截"；切换电台的 AbortError 静默处理
 
 ## 目录结构
 
@@ -21,7 +23,9 @@
 radio-web/
 ├── index.html          # 单页结构
 ├── style.css           # 全部样式（无框架）
-├── app.js              # 全部逻辑：搜索/播放/收藏/中转判定
+├── app.js              # 全部逻辑：搜索/播放/收藏/中转判定/HLS 接管
+├── vendor/
+│   └── hls.min.js      # hls.js 1.5.20（自托管，HLS 台在 Chrome/Edge/Firefox 播放用）
 ├── functions/
 │   └── proxy.js        # Cloudflare Pages Function：http→https 音频中转
 └── test-proxy.mjs      # 中转函数的本地单测（node test-proxy.mjs）
@@ -31,11 +35,12 @@ radio-web/
 
 | 电台流协议 | 处理方式 |
 |---|---|
-| `https://…` | `<audio>` 直接播放 |
-| `http://…` | 自动改写为同源 `/proxy?u=<原始URL>`，由 Pages Function 在服务端拉流 |
-| `.m3u8` (HLS) | 列表中标注 `HLS`；仅 Safari 原生支持，Chrome/Edge 无法播放 |
+| `https://…`（普通流） | `<audio>` 直接播放 |
+| `http://…`（普通流） | 自动改写为同源 `/proxy?u=<原始URL>`，由 Pages Function 在服务端拉流 |
+| `.m3u8` (HLS) | 桌面浏览器走内置 hls.js（MediaSource）；Safari 走原生；流内 http 分片也自动经 `/proxy` |
+| 失败归因 | 按 `MediaError.code` / `play()` 错误类型细分提示（源 521/失效、格式不支持、中转不可达、自动播放拦截）；网络类 HLS 错误自动重试 2 次 |
 
-`functions/proxy.js` 要点：仅放行 http/https 且拒绝内网目标（防开放代理滥用）；透传 `Range`（支持流式/续传）与 UA；流式转发不落盘；`no-store` 不缓存直播流。
+`functions/proxy.js` 要点：仅放行 http/https 且拒绝内网目标（防开放代理滥用）；透传 `Range`（支持流式/续传）与 UA/Referer；上游 15s 无响应即快速失败；流式转发不落盘；`no-store` 不缓存直播流。
 
 ## 本地运行
 
