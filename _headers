@@ -1,0 +1,9 @@
+# Cloudflare Pages 自定义响应头
+# 1) manifest 用标准 MIME，避免边缘整站兜底成 octet-stream 导致部分浏览器不识别
+# 2) sw.js 不缓存：否则更新后的 Service Worker 可能长期不生效
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: public, max-age=0, must-revalidate
+
+/sw.js
+  Cache-Control: no-cache
