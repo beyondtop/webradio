@@ -25,6 +25,7 @@ let favs = loadFavs();  // 收藏列表
 let current = null;     // { ...station, fav:bool }
 let audio = null;       // HTMLAudioElement
 let playing = false;
+let mediaErrJust = false; // error 事件刚提示过（防 play().catch 重复弹 toast）
 let view = "search";
 let lastQuery = "";
 let curPage = 0;            // 当前页（0 起，本地分页）
@@ -118,9 +119,22 @@ function ensureAudio() {
     playing = false; paintPlay();
     liveDot.hidden = true;
     nowSub.textContent = "播放失败";
-    const note = /^http:\/\//i.test(st.url)
-      ? "连接失败（http 流经中转仍不可达，可能电台已失效或地域限制）"
-      : "连接失败：电台可能已失效、防盗链或地域限制";
+    // 刚弹过 error 提示时，紧随其后的 play() reject 不再重复弹（见 playStation）
+    mediaErrJust = true;
+    setTimeout(() => { mediaErrJust = false; }, 1200);
+    // MediaError.code: 1=aborted 2=network 3=decode 4=src not supported
+    const mc = audio.error ? audio.error.code : 0;
+    let note;
+    // hls.js 活动时的失败由其 ERROR 事件提示；这里只管纯 <audio> 路径
+    if (st.hls && !hls && !audio.canPlayType("application/vnd.apple.mpegurl")) {
+      note = "该电台是 HLS(m3u8) 流，此浏览器无法直接播放（可用 Safari 打开）";
+    } else if (mc === 4) {
+      note = "播放失败：该地址返回的不是可解码音频（电台失效、防盗链或地域限制）";
+    } else if (/^http:\/\//i.test(st.url)) {
+      note = "播放失败：http 流经中转仍不可达（电台失效、过慢或地域限制）";
+    } else {
+      note = "播放失败：电台源不可达（失效、防盗链或地域限制）";
+    }
     toast(note, 4000);
   });
   // 直播流：duration 无限 -> 不显示时长，统一 LIVE
@@ -133,26 +147,97 @@ function ensureAudio() {
   return audio;
 }
 
+// hls.js 播放 HLS(m3u8) 流：桌面 Chrome/Edge/Firefox 的 <audio> 原生不支持 m3u8，
+// 仅 Safari 原生可播。优先用 hls.js（MediaSource）实现全浏览器可播。
+let hls = null; // 当前 hls.js 实例
+
+// 同一 HLS 流里的分片若仍是 http://，页面在 https 下会被 mixed-content 拦，
+// 需同样改走 /proxy 中转（与主流的 playableUrl 策略一致）
+function rewriteHlsUrl(u) {
+  return /^http:\/\//i.test(u) ? "proxy?u=" + encodeURIComponent(u) : u;
+}
+
+function stopHls() {
+  if (hls) {
+    try { hls.destroy(); } catch {}
+    hls = null;
+  }
+  // 清掉 hls.js 曾设置/绑定的残留，避免下次直连源时串台
+  if (audio) audio.removeAttribute("src");
+}
+
 function playStation(st) {
   if (!st || !st.url) return toast("该电台没有可用地址");
   current = st;
   const a = ensureAudio();
   nowTitle.textContent = st.name || "未命名电台";
-  if (!/^https:\/\//i.test(st.url)) {
-    nowSub.textContent = "http 流 · 经中转连接…";
-    liveDot.hidden = true;
-  } else {
-    nowSub.textContent = st.meta || "连接中…";
-    liveDot.hidden = true;
-  }
+  const viaProxy = !/^https:\/\//i.test(st.url);
+  nowSub.textContent = st.hls
+    ? (viaProxy ? "HLS · http 经中转连接…" : "HLS 流 · 连接中…")
+    : (viaProxy ? "http 流 · 经中转连接…" : st.meta || "连接中…");
+  liveDot.hidden = true;
   player.hidden = false;
   // 收藏按钮状态
   btnFav.classList.toggle("on", st.fav);
   paintListHighlight();
-  a.src = playableUrl(st);
+
+  const src = playableUrl(st);
+  const nativeHls = a.canPlayType("application/vnd.apple.mpegurl");
+
+  // HLS 台：hls.js(MSE) -> Safari 原生 -> 明确提示
+  if (st.hls && window.Hls && window.Hls.isSupported()) {
+    stopHls();
+    const h = new window.Hls({
+      // 上游 http 分片改走中转（XHR 与 fetch 两种 loader 都覆盖）
+      xhrSetup(xhr, url) { xhr.open("GET", rewriteHlsUrl(url), true); },
+      fetchSetup(context) { context.url = rewriteHlsUrl(context.url); },
+    });
+    hls = h;
+    h.loadSource(src);
+    h.attachMedia(a);
+    h.on(window.Hls.Events.ERROR, (evt, data) => {
+      if (!data || !data.fatal) return;
+      const retried = (h._retried = (h._retried | 0) + 1);
+      if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && retried < 3) {
+        h.startLoad(); // 网络闪断自动重试
+        return;
+      }
+      if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR && retried < 3) {
+        h.recoverMediaError(); // 解码抖动自动恢复
+        return;
+      }
+      stopHls();
+      playing = false; paintPlay();
+      liveDot.hidden = true;
+      nowSub.textContent = "播放失败";
+      toast(viaProxy
+        ? "播放失败：HLS 经中转仍不可达（电台失效或地域限制）"
+        : "播放失败：HLS 源不可达（电台失效或地域限制）", 4000);
+    });
+    a.play().catch((e) => {
+      if (e.name === "AbortError" || mediaErrJust) return;
+      toast("播放失败：无法启动 HLS 流（" + (e.name || "错误") + "）", 3000);
+    });
+    return;
+  }
+
+  // 非 HLS 或 hls.js 不可用：清理旧 hls.js 实例，回到普通 <audio> 直连
+  stopHls();
+  if (st.hls && !nativeHls) {
+    playing = false; paintPlay();
+    nowSub.textContent = "播放失败";
+    return toast("该电台是 HLS(m3u8) 流，此浏览器不支持（可用 Safari 打开）");
+  }
+  a.src = src;
   a.play().catch((e) => {
-    // 自动播放被策略拦截（首次需用户手势）——此处均由点击触发，正常不会走到
-    toast("播放被浏览器拦截，请再次点击条目");
+    // 只有"非用户手势触发的播放"才会被自动播放策略拦；点击触发的失败多与此无关
+    if (e.name === "AbortError") return;            // 被新播放/切台打断：正常，不打扰
+    if (mediaErrJust) return;                        // error 事件刚细分提示过
+    if (e.name === "NotAllowedError") return toast("浏览器拦截了自动播放，请再次点击该电台");
+    if (e.name === "NotSupportedError") {
+      return toast("播放失败：该地址/格式无效，电台可能已失效");
+    }
+    toast("播放失败：电台源不可达或已失效");
   });
 }
 
