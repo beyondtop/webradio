@@ -510,3 +510,12 @@ volume.addEventListener("input", () => {
 // 音量恢复
 const savedVol = parseFloat(localStorage.getItem(VOL_KEY));
 if (!isNaN(savedVol)) { volume.value = savedVol; ensureAudio().volume = savedVol; }
+
+// ---------- PWA ----------
+// 注册 Service Worker：安装为应用后可离线启动/秒开。
+// file:// 或无 SW 支持的环境静默跳过；直播流(/proxy)与跨域 API 不缓存（见 sw.js）。
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
